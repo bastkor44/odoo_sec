@@ -21,8 +21,8 @@ RUN useradd -m -u 1000 appuser
 # Copy application files
 COPY . .
 
-RUN mkdir -p templates static logs reports && \
-    chmod -R 755 templates static logs reports && \
+RUN mkdir -p templates static reports && \
+    chmod -R 755 templates static reports && \
     chown -R appuser:appuser /app
 
 # Switch to non-root user

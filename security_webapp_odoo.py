@@ -56,7 +56,7 @@ test_status = {
 
 def ensure_directories():
     """Ensure all necessary directories exist with proper permissions"""
-    directories = ['templates', 'static', 'logs', 'reports']
+    directories = ['templates', 'static', 'reports']
     for directory in directories:
         dir_path = Path(directory)
         try:
@@ -69,58 +69,14 @@ def ensure_directories():
             print(f"Warning: Directory {directory} permission issue: {e}")
 
 def setup_logging():
-    """Setup logging with bulletproof fallback to console-only if file creation fails"""
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    
-    handlers = [console_handler]
-    
-    log_file_created = False
-    log_file_paths = [
-        'logs/security_webapp_odoo.log',
-        '/tmp/security_webapp_odoo.log',
-        'security_webapp_odoo.log'
-    ]
-    
-    for log_file in log_file_paths:
-        try:
-            log_path = Path(log_file)
-            log_path.parent.mkdir(exist_ok=True, mode=0o755)
-            
-            file_handler = logging.FileHandler(log_file, mode='a')
-            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-            
-            test_logger = logging.getLogger('test')
-            test_logger.addHandler(file_handler)
-            test_logger.info("Log file test")
-            test_logger.removeHandler(file_handler)
-            
-            handlers.append(file_handler)
-            print(f"Log file created successfully: {log_file}")
-            log_file_created = True
-            break
-            
-        except (PermissionError, OSError, IOError) as e:
-            print(f"Warning: Could not create log file {log_file}: {e}")
-            continue
-    
-    if not log_file_created:
-        print("Warning: Using console logging only - no writable log directory found")
-    
-    try:
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=handlers,
-            force=True
-        )
-    except Exception as e:
-        print(f"Warning: Logging configuration failed, using basic console logging: {e}")
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            force=True
-        )
+    """Setup console-only logging for Docker environment"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)],
+        force=True
+    )
+    print("Using console-only logging for Docker environment")
 
 ensure_directories()
 setup_logging()
