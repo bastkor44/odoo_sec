@@ -15,11 +15,18 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Create non-root user for security BEFORE copying files
+RUN useradd -m -u 1000 appuser
+
 # Copy application files
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p templates static logs
+RUN mkdir -p templates static logs reports && \
+    chmod -R 755 templates static logs reports && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Set environment variables
 ENV FLASK_APP=security_webapp_odoo.py
@@ -28,10 +35,6 @@ ENV FLASK_SECRET_KEY=odoo-security-suite-production-key-change-me
 
 # Expose port 5000 (Flask default)
 EXPOSE 5000
-
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
