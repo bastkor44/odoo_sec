@@ -41,33 +41,48 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'odoo-security-suite-key-change-in-production')
 
 def ensure_directories():
-    """Ensure all necessary directories exist"""
+    """Ensure all necessary directories exist with proper permissions"""
     directories = ['templates', 'static', 'logs', 'reports']
     for directory in directories:
-        Path(directory).mkdir(exist_ok=True)
+        try:
+            Path(directory).mkdir(exist_ok=True, mode=0o755)
+            # Try to create a test file to verify write permissions
+            test_file = Path(directory) / '.write_test'
+            test_file.touch()
+            test_file.unlink()
+        except (OSError, PermissionError) as e:
+            print(f"Warning: Cannot create directory {directory} or write to it: {e}")
 
-# Call directory creation
+def setup_logging():
+    """Setup logging with fallback for permission issues"""
+    log_handlers = []
+    
+    # Always add console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    log_handlers.append(console_handler)
+    
+    # Try to add file handler, but fall back gracefully if it fails
+    try:
+        file_handler = logging.FileHandler('logs/security_webapp_odoo.log')
+        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        log_handlers.append(file_handler)
+    except (OSError, PermissionError) as e:
+        print(f"Warning: Cannot create log file, using console logging only: {e}")
+    
+    # Configure logging with available handlers
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=log_handlers,
+        force=True  # Override any existing configuration
+    )
+    
+    return logging.getLogger(__name__)
+
+# Call directory creation and setup logging
 ensure_directories()
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/security_webapp_odoo.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
-
-USERS = {
-    'admin': generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'odoo_security_admin')),
-    'devops': generate_password_hash(os.environ.get('DEVOPS_PASSWORD', 'devops_secure_2024'))
-}
-
-# Global variables for test results and status
-test_results = {}
-test_status = {'running': False, 'progress': 0, 'current_test': ''}
+logger = setup_logging()
 
 def login_required(f):
     """Decorator to require authentication for routes"""
