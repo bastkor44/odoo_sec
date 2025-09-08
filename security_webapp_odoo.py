@@ -40,49 +40,91 @@ except ImportError:
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'odoo-security-suite-key-change-in-production')
 
+# User authentication configuration
+USERS = {
+    'admin': generate_password_hash('odoo_security_admin'),
+    'devops': generate_password_hash('devops_secure_2024')
+}
+
+# Global test state variables
+test_results = {}
+test_status = {
+    'running': False,
+    'progress': 0,
+    'current_test': 'Ready'
+}
+
 def ensure_directories():
     """Ensure all necessary directories exist with proper permissions"""
     directories = ['templates', 'static', 'logs', 'reports']
     for directory in directories:
+        dir_path = Path(directory)
         try:
-            Path(directory).mkdir(exist_ok=True, mode=0o755)
-            # Try to create a test file to verify write permissions
-            test_file = Path(directory) / '.write_test'
+            dir_path.mkdir(exist_ok=True, mode=0o755)
+            os.chmod(str(dir_path), 0o755)
+            test_file = dir_path / '.write_test'
             test_file.touch()
             test_file.unlink()
-        except (OSError, PermissionError) as e:
-            print(f"Warning: Cannot create directory {directory} or write to it: {e}")
+        except (PermissionError, OSError) as e:
+            print(f"Warning: Directory {directory} permission issue: {e}")
 
 def setup_logging():
-    """Setup logging with fallback for permission issues"""
-    log_handlers = []
-    
-    # Always add console handler
+    """Setup logging with bulletproof fallback to console-only if file creation fails"""
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    log_handlers.append(console_handler)
     
-    # Try to add file handler, but fall back gracefully if it fails
+    handlers = [console_handler]
+    
+    log_file_created = False
+    log_file_paths = [
+        'logs/security_webapp_odoo.log',
+        '/tmp/security_webapp_odoo.log',
+        'security_webapp_odoo.log'
+    ]
+    
+    for log_file in log_file_paths:
+        try:
+            log_path = Path(log_file)
+            log_path.parent.mkdir(exist_ok=True, mode=0o755)
+            
+            file_handler = logging.FileHandler(log_file, mode='a')
+            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+            
+            test_logger = logging.getLogger('test')
+            test_logger.addHandler(file_handler)
+            test_logger.info("Log file test")
+            test_logger.removeHandler(file_handler)
+            
+            handlers.append(file_handler)
+            print(f"Log file created successfully: {log_file}")
+            log_file_created = True
+            break
+            
+        except (PermissionError, OSError, IOError) as e:
+            print(f"Warning: Could not create log file {log_file}: {e}")
+            continue
+    
+    if not log_file_created:
+        print("Warning: Using console logging only - no writable log directory found")
+    
     try:
-        file_handler = logging.FileHandler('logs/security_webapp_odoo.log')
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        log_handlers.append(file_handler)
-    except (OSError, PermissionError) as e:
-        print(f"Warning: Cannot create log file, using console logging only: {e}")
-    
-    # Configure logging with available handlers
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=log_handlers,
-        force=True  # Override any existing configuration
-    )
-    
-    return logging.getLogger(__name__)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=handlers,
+            force=True
+        )
+    except Exception as e:
+        print(f"Warning: Logging configuration failed, using basic console logging: {e}")
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            force=True
+        )
 
-# Call directory creation and setup logging
 ensure_directories()
-logger = setup_logging()
+setup_logging()
+logger = logging.getLogger(__name__)
 
 def login_required(f):
     """Decorator to require authentication for routes"""
@@ -210,11 +252,15 @@ def download_report():
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     report_filename = f'reports/odoo_security_report_{timestamp}.json'
     
-    with open(report_filename, 'w') as f:
-        json.dump(report, f, indent=2)
+    try:
+        with open(report_filename, 'w') as f:
+            json.dump(report, f, indent=2)
+        logger.info(f"Security report downloaded by {session['user']}: {report_filename}")
+        flash(f'Report saved as {report_filename}', 'success')
+    except (PermissionError, OSError) as e:
+        logger.error(f"Failed to save report: {e}")
+        flash('Failed to save report file. Check permissions.', 'error')
     
-    logger.info(f"Security report downloaded by {session['user']}: {report_filename}")
-    flash(f'Report saved as {report_filename}', 'success')
     return redirect(url_for('dashboard'))
 
 def execute_security_tests(config):
@@ -645,18 +691,19 @@ function pollTestStatus() {
 </div>
 {% endblock %}'''
 
-    # Write template files
-    with open('templates/base.html', 'w') as f:
-        f.write(base_template)
+    templates = [
+        ('templates/base.html', base_template),
+        ('templates/login.html', login_template),
+        ('templates/dashboard.html', dashboard_template),
+        ('templates/configure.html', configure_template)
+    ]
     
-    with open('templates/login.html', 'w') as f:
-        f.write(login_template)
-    
-    with open('templates/dashboard.html', 'w') as f:
-        f.write(dashboard_template)
-    
-    with open('templates/configure.html', 'w') as f:
-        f.write(configure_template)
+    for filename, content in templates:
+        try:
+            with open(filename, 'w') as f:
+                f.write(content)
+        except (PermissionError, OSError) as e:
+            print(f"Warning: Could not create template file {filename}: {e}")
 
 if __name__ == '__main__':
     logger.info("Starting Odoo Security Test Suite Web Application")
