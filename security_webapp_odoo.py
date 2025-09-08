@@ -51,8 +51,6 @@ def ensure_directories():
         except PermissionError:
             pass  # Ignore permission errors in restricted environments
 
-ensure_directories()
-
 def setup_logging():
     """Setup logging with fallback to console-only if file creation fails"""
     handlers = []
@@ -77,17 +75,9 @@ def setup_logging():
         handlers=handlers
     )
 
+ensure_directories()
 setup_logging()
 logger = logging.getLogger(__name__)
-
-USERS = {
-    'admin': generate_password_hash(os.environ.get('ADMIN_PASSWORD', 'odoo_security_admin')),
-    'devops': generate_password_hash(os.environ.get('DEVOPS_PASSWORD', 'devops_secure_2024'))
-}
-
-# Global variables for test results and status
-test_results = {}
-test_status = {'running': False, 'progress': 0, 'current_test': ''}
 
 def login_required(f):
     """Decorator to require authentication for routes"""
