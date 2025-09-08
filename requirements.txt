@@ -1,0 +1,12 @@
+flask==2.3.3
+requests==2.31.0
+werkzeug==2.3.7
+psutil==5.9.5
+# Additional dependencies for security testing
+urllib3==2.0.4
+ssl==0.0.0
+socket==0.0.0
+# For better JSON handling and datetime
+python-dateutil==2.8.2
+# For improved security
+cryptography==41.0.4
