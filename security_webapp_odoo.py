@@ -40,6 +40,20 @@ except ImportError:
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'odoo-security-suite-key-change-in-production')
 
+# User authentication configuration
+USERS = {
+    'admin': generate_password_hash('odoo_security_admin'),
+    'devops': generate_password_hash('devops_secure_2024')
+}
+
+# Global test state variables
+test_results = {}
+test_status = {
+    'running': False,
+    'progress': 0,
+    'current_test': 'Ready'
+}
+
 def ensure_directories():
     """Ensure all necessary directories exist with proper permissions"""
     directories = ['templates', 'static', 'logs', 'reports']
