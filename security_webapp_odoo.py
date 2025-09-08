@@ -67,26 +67,27 @@ def ensure_directories():
 
 def setup_logging():
     """Setup logging with fallback to console-only if file creation fails"""
-    handlers = []
-    
-    # Always add console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-    handlers.append(console_handler)
     
-    # Try to add file handler, fallback to console-only if it fails
+    handlers = [console_handler]
+    
+    # Try to add file handler, but don't fail if it can't be created
     try:
         log_file = 'logs/security_webapp_odoo.log'
         file_handler = logging.FileHandler(log_file)
         file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         handlers.append(file_handler)
+        print(f"Log file created successfully: {log_file}")
     except (PermissionError, OSError) as e:
         print(f"Warning: Could not create log file, using console logging only: {e}")
     
+    # Configure logging with only the handlers that were successfully created
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=handlers
+        handlers=handlers,
+        force=True  # Override any existing configuration
     )
 
 ensure_directories()
