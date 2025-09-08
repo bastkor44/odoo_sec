@@ -9,11 +9,6 @@ services:
     environment:
       - FLASK_SECRET_KEY=odoo-security-suite-production-key-please-change
       - FLASK_ENV=production
-    volumes:
-      # Mount logs directory for persistent logging
-      - ./logs:/app/logs
-      # Mount reports directory for persistent reports
-      - ./reports:/app/reports
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/login"]
